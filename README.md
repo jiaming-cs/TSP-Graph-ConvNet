@@ -21,6 +21,10 @@ pip install torch==1.7.1+cpu torchvision==0.8.2+cpu torchaudio===0.7.2 -f https:
 pip install -r requirements.txt
 ```
 
+# Download the Dataset
+
+Donwnload [data.zip](https://kennesawedu-my.sharepoint.com/:u:/g/personal/jli36_students_kennesaw_edu/EWPJRJxyKe1Avyuz5ZzD8loBO_1eKnOll7Q8Z7w-9HWcWQ?e=zDpEf4), unzip it under the folder TSP-GRAPH-CONVNET/data/.
+
 # Try Test Code
 ```
 python test.py
