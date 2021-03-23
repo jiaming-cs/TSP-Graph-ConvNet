@@ -2,7 +2,7 @@
   "expt_name": "tsp20",
   "gpu_id": "1",
 
-  "train_filepath": "./data/tsp20_train_concorde.txt",
+  "train_filepath": "./data/tsp20_test_concorde.txt",
   "val_filepath": "./data/tsp20_val_concorde.txt",
   "test_filepath": "./data/tsp20_test_concorde.txt",
 

@@ -1,12 +1,13 @@
-import torch
+
 import torch.nn.functional as F
 
-import matplotlib
 import matplotlib.pyplot as plt
 import networkx as nx
 
 from utils.graph_utils import *
+from partial_refinement import PartialRefinement
 
+pr = PartialRefinement()
 
 def plot_tsp(p, x_coord, W, W_val, W_target, title="default"):
     """
@@ -46,6 +47,90 @@ def plot_tsp(p, x_coord, W, W_val, W_target, title="default"):
     p.set_title(title)
     return p
 
+def plot_confuse(p, x_coord, W, W_val, W_target, refinment_parts, title="default"):
+    """
+    Helper function to plot TSP tours.
+    
+    Args:
+        p: Matplotlib figure/subplot
+        x_coord: Coordinates of nodes
+        W: Edge adjacency matrix
+        W_val: Edge values (distance) matrix
+        W_target: One-hot matrix with 1s on groundtruth/predicted edges
+        title: Title of figure/subplot
+    
+    Returns:
+        p: Updated figure/subplot
+    
+    """
+
+    def _edges_to_node_pairs(W):
+        """Helper function to convert edge matrix into pairs of adjacent nodes.
+        """
+        pairs = []
+        for r in range(len(W)):
+            for c in range(len(W)):
+                if W[r][c] == 1:
+                    pairs.append((r, c))
+        return pairs
+    
+    def _get_confused_edges(confused_group):
+        pairs = []
+        for r in confused_group:
+            for i in range(len(r)):
+                if i+1<len(r):
+                    pairs.append((r[i], r[i+1]))
+        return pairs
+    
+    G = nx.from_numpy_matrix(W_val)
+    pos = dict(zip(range(len(x_coord)), x_coord.tolist()))
+    adj_pairs = _edges_to_node_pairs(W)
+    target_pairs = _edges_to_node_pairs(W_target)
+    colors = ['g'] + ['b'] * (len(x_coord) - 1)  # Green for 0th node, blue for others
+    confused_parts = _get_confused_edges(refinment_parts)
+    nx.draw_networkx_nodes(G, pos, node_color=colors, node_size=50)
+    nx.draw_networkx_edges(G, pos, edgelist=target_pairs, alpha=1, width=1, edge_color='r')
+    nx.draw_networkx_edges(G, pos, edgelist=confused_parts, alpha=1, width=1, edge_color="yellow")
+    p.set_title(title)
+    return p
+
+
+def plot_greedy(p, x_coord, W, W_val, W_target, title="default"):
+    """
+    Helper function to plot TSP tours.
+    
+    Args:
+        p: Matplotlib figure/subplot
+        x_coord: Coordinates of nodes
+        W: Edge adjacency matrix
+        W_val: Edge values (distance) matrix
+        W_target: One-hot matrix with 1s on groundtruth/predicted edges
+        title: Title of figure/subplot
+    
+    Returns:
+        p: Updated figure/subplot
+    
+    """
+
+    def _edges_to_node_pairs(W):
+        """Helper function to convert edge matrix into pairs of adjacent nodes.
+        """
+        pairs = []
+        for r in range(len(W)):
+            for c in range(len(W)):
+                if W[r][c] == 1:
+                    pairs.append((r, c))
+        return pairs
+    
+    G = nx.from_numpy_matrix(W_val)
+    pos = dict(zip(range(len(x_coord)), x_coord.tolist()))
+    target_pairs = _edges_to_node_pairs(W_target)
+    colors = ['g'] + ['b'] * (len(x_coord) - 1)  # Green for 0th node, blue for others
+    nx.draw_networkx_nodes(G, pos, node_color=colors, node_size=50, label=[str(i) for i in range(len(target_pairs))] )
+    print(target_pairs)
+    nx.draw_networkx_edges(G, pos, edgelist=target_pairs, alpha=1, width=1, edge_color='r')
+    p.set_title(title)
+    return p
 
 def plot_tsp_heatmap(p, x_coord, W_val, W_pred, title="default"):
     """
@@ -98,21 +183,30 @@ def plot_predictions(x_nodes_coord, x_edges, x_edges_values, y_edges, y_pred_edg
         num_plots: Number of figures to plot
     
     """
+
+    
     y = F.softmax(y_pred_edges, dim=3)  # B x V x V x voc_edges
     y_bins = y.argmax(dim=3)  # Binary predictions: B x V x V
     y_probs = y[:,:,:,1]  # Prediction probabilities: B x V x V
     for f_idx, idx in enumerate(np.random.choice(len(y), num_plots, replace=False)):
-        f = plt.figure(f_idx, figsize=(10, 5))
+        f = plt.figure(f_idx, figsize=(20, 5))
         x_coord = x_nodes_coord[idx].cpu().numpy()
         W = x_edges[idx].cpu().numpy()
         W_val = x_edges_values[idx].cpu().numpy()
         W_target = y_edges[idx].cpu().numpy()
         W_sol_bins = y_bins[idx].cpu().numpy()
         W_sol_probs = y_probs[idx].cpu().numpy()
-        plt1 = f.add_subplot(121)
+        plt1 = f.add_subplot(141)
         plot_tsp(plt1, x_coord, W, W_val, W_target, 'Groundtruth: {:.3f}'.format(W_to_tour_len(W_target, W_val)))
-        plt2 = f.add_subplot(122)
+        plt2 = f.add_subplot(142)
         plot_tsp_heatmap(plt2, x_coord, W_val, W_sol_probs, 'Prediction Heatmap')
+        plt3 = f.add_subplot(143)
+        greedy_sol, sol_edges = pr.greedy_search(W_sol_probs)
+        plot_greedy(plt3, x_coord, W, W_val, sol_edges, 'Greedy Result')
+        print(pr.find_confused_parts(W_sol_probs, greedy_sol))
+        plt4 = f.add_subplot(144)
+        confused_parts = pr.find_confused_parts(W_sol_probs, greedy_sol)
+        plot_confuse(plt4, x_coord, W, W_val, sol_edges, confused_parts, 'Confused Parts')
         plt.show()
 
 
@@ -133,6 +227,7 @@ def plot_predictions_beamsearch(x_nodes_coord, x_edges, x_edges_values, y_edges,
     y = F.softmax(y_pred_edges, dim=3)  # B x V x V x voc_edges
     y_bins = y.argmax(dim=3)  # Binary predictions: B x V x V
     y_probs = y[:,:,:,1]  # Prediction probabilities: B x V x V
+    
     for f_idx, idx in enumerate(np.random.choice(len(y), num_plots, replace=False)):
         f = plt.figure(f_idx, figsize=(15, 5))
         x_coord = x_nodes_coord[idx].cpu().numpy()
