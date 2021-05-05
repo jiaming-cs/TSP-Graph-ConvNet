@@ -4,7 +4,6 @@ import torch
 
 class Beamsearch(object):
     """Class for managing internals of beamsearch procedure.
-
     References:
         General: https://github.com/OpenNMT/OpenNMT-py/blob/master/onmt/translate/beam.py
         For TSP: https://github.com/alexnowakvila/QAP_pt/blob/master/src/tsp/beam_search.py
@@ -51,7 +50,7 @@ class Beamsearch(object):
         """Get the output of the beam at the current timestep.
         """
         current_state = (self.next_nodes[-1].unsqueeze(2)
-                         .expand(self.batch_size, self.beam_size, self.num_nodes)).long()
+                         .expand(self.batch_size, self.beam_size, self.num_nodes))
         return current_state
 
     def get_current_origin(self):
@@ -61,7 +60,6 @@ class Beamsearch(object):
 
     def advance(self, trans_probs):
         """Advances the beam based on transition probabilities.
-
         Args:
             trans_probs: Probabilities of advancing from the previous step (batch_size, beam_size, num_nodes)
         """
@@ -92,7 +90,7 @@ class Beamsearch(object):
         new_nodes = bestScoresId - prev_k * self.num_nodes
         self.next_nodes.append(new_nodes)
         # Re-index mask
-        perm_mask = prev_k.unsqueeze(2).expand_as(self.mask).long()  # (batch_size, beam_size, num_nodes)
+        perm_mask = prev_k.unsqueeze(2).expand_as(self.mask)  # (batch_size, beam_size, num_nodes)
         self.mask = self.mask.gather(1, perm_mask)
         # Mask newly added nodes
         self.update_mask(new_nodes)
@@ -122,7 +120,6 @@ class Beamsearch(object):
 
     def get_hypothesis(self, k):
         """Walk back to construct the full hypothesis.
-
         Args:
             k: Position in the beam to construct (usually 0s for most probable hypothesis)
         """
@@ -130,6 +127,6 @@ class Beamsearch(object):
 
         hyp = -1 * torch.ones(self.batch_size, self.num_nodes).type(self.dtypeLong)
         for j in range(len(self.prev_Ks) - 1, -2, -1):
-            hyp[:, j + 1] = self.next_nodes[j + 1].gather(1, k.long()).view(1, self.batch_size)
-            k = self.prev_Ks[j].gather(1, k.long())
+            hyp[:, j + 1] = self.next_nodes[j + 1].gather(1, k).view(1, self.batch_size)
+            k = self.prev_Ks[j].gather(1, k)
         return hyp

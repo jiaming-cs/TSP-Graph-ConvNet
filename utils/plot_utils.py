@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 import networkx as nx
 
 from utils.graph_utils import *
-from partial_refinement import PartialRefinement
+from TspSolvers import TspSolvers
 
-pr = PartialRefinement()
+sovler = TspSolvers()
 
 def plot_tsp(p, x_coord, W, W_val, W_target, title="default"):
     """
@@ -132,6 +132,43 @@ def plot_greedy(p, x_coord, W, W_val, W_target, title="default"):
     p.set_title(title)
     return p
 
+def plot_tsp_total_heatmap(p, x_coord, W_val, W_pred, title="default"):
+    """
+    Helper function to plot predicted TSP tours with edge strength denoting confidence of prediction.
+    
+    Args:
+        p: Matplotlib figure/subplot
+        x_coord: Coordinates of nodes
+        W_val: Edge values (distance) matrix
+        W_pred: Edge predictions matrix
+        title: Title of figure/subplot
+    
+    Returns:
+        p: Updated figure/subplot
+    
+    """
+
+    def _edges_to_node_pairs(W):
+        """Helper function to convert edge matrix into pairs of adjacent nodes.
+        """
+        pairs = []
+        edge_preds = []
+        for r in range(len(W)):
+            for c in range(len(W)):
+                pairs.append((r, c))
+                edge_preds.append(W[r][c])
+        return pairs, edge_preds
+        
+    G = nx.from_numpy_matrix(W_val)
+    pos = dict(zip(range(len(x_coord)), x_coord.tolist()))
+    node_pairs, edge_color = _edges_to_node_pairs(W_pred)
+    node_color = ['g'] + ['b'] * (len(x_coord) - 1)  # Green for 0th node, blue for others
+    nx.draw_networkx_nodes(G, pos, node_color=node_color, node_size=50)
+    nx.draw_networkx_edges(G, pos, edgelist=node_pairs, edge_color=edge_color, edge_cmap=plt.cm.Reds, width=0.75)
+    p.set_title(title)
+    return p
+
+
 def plot_tsp_heatmap(p, x_coord, W_val, W_pred, title="default"):
     """
     Helper function to plot predicted TSP tours with edge strength denoting confidence of prediction.
@@ -155,7 +192,7 @@ def plot_tsp_heatmap(p, x_coord, W_val, W_pred, title="default"):
         edge_preds = []
         for r in range(len(W)):
             for c in range(len(W)):
-                if W[r][c] > 0.25:
+                if W[r][c] > 0.1:
                     pairs.append((r, c))
                     edge_preds.append(W[r][c])
         return pairs, edge_preds
@@ -170,7 +207,7 @@ def plot_tsp_heatmap(p, x_coord, W_val, W_pred, title="default"):
     return p
 
 
-def plot_predictions(x_nodes_coord, x_edges, x_edges_values, y_edges, y_pred_edges, num_plots=3):
+def plot_predictions(x_nodes_coord, x_edges, x_edges_values, y_edges, y_pred_edges, kind, num_plots=3):
     """
     Plots groundtruth TSP tour vs. predicted tours (without beamsearch).
     
@@ -189,26 +226,41 @@ def plot_predictions(x_nodes_coord, x_edges, x_edges_values, y_edges, y_pred_edg
     y_bins = y.argmax(dim=3)  # Binary predictions: B x V x V
     y_probs = y[:,:,:,1]  # Prediction probabilities: B x V x V
     for f_idx, idx in enumerate(np.random.choice(len(y), num_plots, replace=False)):
-        f = plt.figure(f_idx, figsize=(20, 5))
+        f = plt.figure(f_idx, figsize=(15, 5))
         x_coord = x_nodes_coord[idx].cpu().numpy()
         W = x_edges[idx].cpu().numpy()
         W_val = x_edges_values[idx].cpu().numpy()
         W_target = y_edges[idx].cpu().numpy()
         W_sol_bins = y_bins[idx].cpu().numpy()
         W_sol_probs = y_probs[idx].cpu().numpy()
-        plt1 = f.add_subplot(141)
+        
+        # Plot Ground Truth
+        plt1 = f.add_subplot(131)
         plot_tsp(plt1, x_coord, W, W_val, W_target, 'Groundtruth: {:.3f}'.format(W_to_tour_len(W_target, W_val)))
-        plt2 = f.add_subplot(142)
-        plot_tsp_heatmap(plt2, x_coord, W_val, W_sol_probs, 'Prediction Heatmap')
-        plt3 = f.add_subplot(143)
-        greedy_sol, sol_edges = pr.greedy_search(W_sol_probs)
-        plot_greedy(plt3, x_coord, W, W_val, sol_edges, 'Greedy Result')
-        print(pr.find_confused_parts(W_sol_probs, greedy_sol))
-        plt4 = f.add_subplot(144)
-        confused_parts = pr.find_confused_parts(W_sol_probs, greedy_sol)
-        plot_confuse(plt4, x_coord, W, W_val, sol_edges, confused_parts, 'Confused Parts')
-        plt.show()
+        
+        # Plot Heat Map With Threadl
+        plt2 = f.add_subplot(132)
+        plot_tsp_heatmap(plt2, x_coord, W_val, W_sol_probs, 'Probility Heatmap with Threshold 0.1')
+        plt3 = f.add_subplot(133)
+        # Plot prob Gready
+        if kind == 1:
 
+            greedy_sol, sol_edges, _ = sovler.greedy_search(W_sol_probs, W_val)
+            plot_greedy(plt3, x_coord, W, W_val, sol_edges, 'Greedy')
+        elif kind == 2:    
+            greedy_sol, sol_edges, _ = sovler.future_reward(W_sol_probs) 
+            plot_greedy(plt3, x_coord, W, W_val, sol_edges, 'Future Reward')
+    
+        elif kind == 3:
+            greedy_sol, sol_edges, _ = sovler.exclusive_search(W_sol_probs, W_val) 
+            
+            plot_greedy(plt3, x_coord, W, W_val, sol_edges, 'Branch Puring + Beam Search')
+            
+        
+
+        plt.show()
+        
+   
 
 def plot_predictions_beamsearch(x_nodes_coord, x_edges, x_edges_values, y_edges, y_pred_edges, bs_nodes, num_plots=3):
     """

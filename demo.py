@@ -4,11 +4,14 @@ from torch.autograd import Variable
 import torch.nn as nn
 from sklearn.utils.class_weight import compute_class_weight
 
+
+
 # Remove warning
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 from scipy.sparse import SparseEfficiencyWarning
 warnings.simplefilter('ignore', SparseEfficiencyWarning)
+import argparse
 
 from config import *
 from utils.graph_utils import *
@@ -68,7 +71,7 @@ class GraphConvNet():
 
         self.net.eval() # switch to evaluation model
         
-    def get_edge_heatmap(self):
+    def get_edge_heatmap(self, kind):
 
 
         batch_size = 10
@@ -100,12 +103,38 @@ class GraphConvNet():
             loss = loss.mean()
             
             print(y_preds.shape)
+            
 
             # Plot prediction visualizations
-            plot_predictions(x_nodes_coord, x_edges, x_edges_values, y_edges, y_preds, num_plots=batch_size)
+            plot_predictions(x_nodes_coord, x_edges, x_edges_values, y_edges, y_preds, kind, num_plots=batch_size)
+            # plot_predictions_confused(x_nodes_coord, x_edges, x_edges_values, y_edges, y_preds, kind, num_plots=batch_size)
             
             
 if __name__ == "__main__":
+    
+    
+    '''
+    Examples:
+    python demo.py -m gd   //plot greedy search method result
+    python demo.py -m pb   //plot branch purning + beam search method result
+    python demo.py -m fr   //plot future reward method result
+    '''
+    
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument("--method", '-m', type=str, default='gd', help="serach method")
+   
+    args = parser.parse_args()
+
+    if args.method == 'gd':
+        kind = 1
+    elif args.method == 'pb':
+        kind = 3
+    elif args.method == 'fr':
+        kind = 2
+    else:
+        print("Invalid mehtod!")
+        exit(0)
     gc = GraphConvNet("tsp50")
     gc.load_model()
-    gc.get_edge_heatmap()
+    gc.get_edge_heatmap(kind)

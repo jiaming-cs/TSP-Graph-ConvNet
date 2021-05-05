@@ -25,14 +25,12 @@ pip install -r requirements.txt
 
 Donwnload [data.zip](https://kennesawedu-my.sharepoint.com/:u:/g/personal/jli36_students_kennesaw_edu/EWPJRJxyKe1Avyuz5ZzD8loBO_1eKnOll7Q8Z7w-9HWcWQ?e=zDpEf4), unzip it under the folder TSP-GRAPH-CONVNET/data/.
 
-# Try Test Code
+# Try Demo Code
 ```
-python test.py
+python demo.py -m gd
 ```
-# TODO
-* Read [paper](https://arxiv.org/abs/1906.01227)
-* Run the code [Graph CovNet Implementation](https://github.com/chaitjo/graph-convnet-tsp)
-* Come up ideas
-* Prepare proposal presentaion
-* ...
 
+# Try evaluation Code
+```
+python evaluation.py -s 20 -b 100 -m gd
+```
